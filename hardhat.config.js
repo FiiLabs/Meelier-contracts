@@ -38,7 +38,7 @@ module.exports = {
     apiKey: ETHERSCAN_KEY
   },
   gasReporter: {
-    enabled: true,
+    enabled: false,
     // outputFile: "gas-reporter.txt",
     noColors: true,
     currency: "USD",
