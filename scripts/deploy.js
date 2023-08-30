@@ -7,7 +7,7 @@
 const hre = require("hardhat");
 
 async function main() {
-  const meelier = await hre.ethers.deployContract("Meelier", ["LeeJ", "LeeJ", "ipfs://QmaWCEnpwKgwuW2UW4J4vhGBAxiHom6LLaVD6UhdZvvkdx/"]);
+  const meelier = await hre.ethers.deployContract("Meelier", ["TMeelier", "TMeelier", "ipfs://QmaWCEnpwKgwuW2UW4J4vhGBAxiHom6LLaVD6UhdZvvkdx/"]);
 
   await meelier.waitForDeployment();
 
