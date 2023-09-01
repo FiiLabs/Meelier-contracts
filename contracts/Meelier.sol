@@ -116,43 +116,49 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906 {
 
     function setBaseURI(string memory baseURI_) external onlyOwner() {
         _baseTokenURI = baseURI_;
-        emit BatchMetadataUpdate(1, _total_issue);
+        emit BatchMetadataUpdate(1, _total_issue.sub(1));
     }
 
     function _baseURI() internal view virtual override returns (string memory) {
         return _baseTokenURI;
     }
 
-    function freeMint(uint tokenId_) external onlyOwner {
-        require(tokenId_ > 0 && tokenId_ <= _total_issue, "Wrong tokenId");
-        _safeMint(msg.sender, tokenId_);
-    }
+    // function freeMint(uint tokenId_) external onlyOwner {
+    //     require(tokenId_ > 0 && tokenId_ <= _total_issue, "Wrong tokenId");
+    //     _safeMint(msg.sender, tokenId_);
+    // }
 
-    function freeMintBatch(uint numberOfTokens_) external onlyOwner {
-        uint256 ts = totalSupply();
-        require(numberOfTokens_ > 0 && ts.add(numberOfTokens_) <= _total_issue, "Wrong number");
-        for (uint256 i = 1; i <= numberOfTokens_; i++) {
-            _safeMint(msg.sender, ts.add(i));
-        }
-    }
+    // function freeMintBatch(uint numberOfTokens_) external onlyOwner {
+    //     uint256 ts = totalSupply();
+    //     require(numberOfTokens_ > 0 && ts.add(numberOfTokens_) <= _total_issue, "Wrong number");
+    //     for (uint256 i = 1; i <= numberOfTokens_; i++) {
+    //         _safeMint(msg.sender, ts.add(i));
+    //     }
+    // }
 
-    function mintBatchByOwner(uint batch_, uint numberOfTokens_) public payable onlyOwner{
-        uint256 ts = totalSupply();
-        require(ts.add(numberOfTokens_) <= _total_issue, "Mint exceed max issued");
+    // function mintBatchByOwner(uint batch_, uint numberOfTokens_) public payable onlyOwner{
+    //     uint256 ts = totalSupply();
+    //     require(ts.add(numberOfTokens_) <= _total_issue, "Mint exceed max issued");
 
-        uint256 total_fee = _issueBatch[batch_].price* numberOfTokens_;
-        require(total_fee <= msg.value, "Insufficient funds");
+    //     uint256 total_fee = _issueBatch[batch_].price* numberOfTokens_;
+    //     require(total_fee <= msg.value, "Insufficient funds");
 
-        for (uint256 i = 1; i <= numberOfTokens_; i++) {
-            _safeMint(msg.sender, ts.add(i));
-        }
-    }
+    //     for (uint256 i = 1; i <= numberOfTokens_; i++) {
+    //         _safeMint(msg.sender, ts.add(i));
+    //     }
+    // }
 
     function burn(uint256 tokenId_) public onlyOwner {
         require(tokenId_ > 0 && tokenId_ <= _total_issue, "Wrong tokenId");
         require(_exists(tokenId_), "Only burn minted");
         _burn(tokenId_);
     }
+
+    // function mintPrice() public view returns (uint256) {
+    //     uint256 ts = totalSupply();
+    //     uint256 firstId = ts.add(1);
+    //     return getMintPrice(firstId);
+    // }
 
     function getMintPrice(uint tokenId_) public view returns (uint256) {
         uint256 startIndex = 0;
@@ -196,7 +202,7 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906 {
         require(ts.add(numberOfTokens_) < _issueBatch[batch].startIndex.add(_issueBatch[batch].count), "Mint exceed batch issued");
         if(_issueBatch[batch].mintWhite) {
             require(_whitelist[msg.sender], "Mint only whitelist");
-            require(numberOfTokens_<= _whitelistMintLimit, "Exceed whitelist mint limit");
+            require(balanceOf(msg.sender).add(numberOfTokens_)<= _whitelistMintLimit, "Exceed whitelist mint limit");
         }
         uint256 total_fee = _issueBatch[batch].price.mul(numberOfTokens_);
         require(total_fee <= msg.value, "Insufficient funds");
@@ -239,7 +245,16 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906 {
     //         _safeMint(msg.sender, ts.add(i));
     //     }
     // }
+    function mintList() external view returns (uint256[] memory) {
+        uint256 count = balanceOf(msg.sender);
+        uint256[] memory newArray = new uint256[](count);
 
+        for (uint256 i = 0; i < count; i++) {
+            newArray[i] = tokenOfOwnerByIndex(msg.sender, i);
+        }
+        return newArray;
+    }
+    
     function isMinted(uint256 tokenId_) external view returns (bool) {
         require(
             tokenId_ <= _total_issue,

@@ -13,6 +13,12 @@ async function main() {
 
   console.log( `deployed to ${meelier.target}`
   );
+  const tx = await meelier.startMint(0);
+  await tx.wait();
+  console.log("startMint success,hash:"+ tx.hash);
+  const tx1 = await meelier.updateIssueBatch(0, 1, 1000, BigInt(50000000000000000), false);
+  await tx1.wait();
+  console.log("updateIssueBatch success,hash:"+ tx1.hash);
 }
 
 // We recommend this pattern to be able to use async/await everywhere

@@ -27,19 +27,12 @@ const {
         const { meelier, owner } = await loadFixture(deployMeelierFixture);
         expect(await meelier._baseTokenURI()).to.equal(init_metadata_ipfs);
         expect(await meelier.totalIssue()).to.equal(max_supply);
-        expect(await meelier._issueBatchCount()).to.equal(2);
+        expect(await meelier._issueBatchCount()).to.equal(1);
         const batch = await meelier._issueBatch(0);
-        expect(batch.startIndex).to.equal(51);
-        expect(batch.count).to.equal(450);
+        expect(batch.startIndex).to.equal(1);
+        expect(batch.count).to.equal(1000);
         expect(batch.price).to.equal(nft_whitelist_price);
         expect(batch.mintWhite).to.equal(true);
-        const batch1 = await meelier._issueBatch(1);
-        expect(batch1.startIndex).to.equal(501);
-        expect(batch1.count).to.equal(500);
-        expect(batch1.price).to.equal(nft_normal_price);
-        expect(batch1.mintWhite).to.equal(false);
-        expect(await meelier._startMint(0)).to.equal(start_mint);
-        expect(await meelier._startMint(1)).to.equal(start_mint);
       });
     });
   
@@ -125,41 +118,27 @@ const {
       it("Mint check", async function () {
         const { meelier, owner } = await loadFixture(deployMeelierFixture);
         await meelier.startMint(0);
-        await meelier.startMint(1);
-        //tokenId wrong
-        let  tokenId = max_supply + 1
-        await expect(meelier.mint(tokenId, { value: nft_normal_price })).to.be.revertedWith(
-          "Wrong tokenId"
-        );
-        tokenId = max_supply
-        await expect(meelier.mint(tokenId, { value: nft_normal_price })).not.to.be.reverted;
-        tokenId = 0
-        await expect(meelier.mint(tokenId, { value: nft_normal_price })).to.be.revertedWith(
-          "Wrong tokenId"
-        );
-        tokenId = max_supply - 1
-        await expect(meelier.mint(tokenId, { value: nft_normal_price })).not.to.be.reverted;
-        tokenId = 51
-        await expect(meelier.mint(tokenId, { value: nft_normal_price })).to.be.revertedWith(
+        expect(await meelier.isMinted(await meelier.totalSupply())).to.equal(false);
+        await expect(meelier.mint(1, { value: nft_whitelist_price })).to.be.revertedWith(
           "Mint only whitelist"
         );
         // add whitelist,then mint success
         expect(await meelier.addWhitelist(owner.address)).not.to.be.reverted;
-        await expect(meelier.mint(tokenId, { value: nft_whitelist_price })).not.to.be.reverted;
-        tokenId = 501
-        await expect(meelier.mint(tokenId, { value: nft_normal_price })).not.to.be.reverted;
-        expect(await meelier.isMinted(tokenId)).to.equal(true);
+        await expect(meelier.mint(1, { value: nft_whitelist_price })).not.to.be.reverted;
+        expect(await meelier.isMinted(await meelier.totalSupply())).to.equal(true);
       });
 
       it("Mint 50 for market", async function () {
         const { meelier, owner, otherAccount} = await loadFixture(deployMeelierFixture);
+        await meelier.startMint(0);
+        expect(await meelier.updateIssueBatch(0, 1, 1000, nft_normal_price, false)).not.to.be.reverted;
         expect(await meelier.totalSupply()).to.equal(0);
         expect(await meelier.totalIssue()).to.equal(1000);
         for(let i=1;i<=50;i++) {
           expect(await meelier.isMinted(i)).to.equal(false);
         }
         // owner mint nft no matter then _startMint is set or not
-        expect(await meelier.freeMintBatch(50)).not.to.be.reverted;
+        expect(await meelier.mint(50, { value: nft_normal_price*BigInt(50) })).not.to.be.reverted;
         for(let i=1;i<=50;i++) {
           expect(await meelier.isMinted(i)).to.equal(true);
           expect(await meelier.ownerOf(i)).to.equal(owner.address);
@@ -170,13 +149,17 @@ const {
       });
       it("Mint list", async function () {
         const { meelier, owner, otherAccount} = await loadFixture(deployMeelierFixture);
-        await meelier.startMint(1);
-        await expect(meelier.mintBatch(1, 50, { value: nft_normal_price*BigInt(50) })).not.to.be.reverted;
+        await meelier.startMint(0);
+        expect(await meelier.updateIssueBatch(0, 1, 1000, nft_normal_price, false)).not.to.be.reverted;
+        await expect(meelier.mint(50, { value: nft_normal_price*BigInt(50) })).not.to.be.reverted;
         const nft_count = await meelier.balanceOf(owner.address);
         expect(nft_count).to.equal(50);
         for(let i=1;i<=50;i++) {
           expect(await meelier.tokenOfOwnerByIndex(owner.address, i-1)).to.equal(i);
         }
+        console.log(await meelier.mintList());
+        await expect(meelier.connect(otherAccount).mint(50, { value: nft_normal_price*BigInt(50) })).not.to.be.reverted;
+        console.log(await meelier.connect(otherAccount).mintList());
       });
     });
   });
