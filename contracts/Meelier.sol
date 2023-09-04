@@ -50,7 +50,7 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl{
         _issueBatchCount = 1;
         _total_issue = 1000;
         _whitelistMintLimit = 1;
-        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _threshold = 2; // 2/3
     }
     
@@ -143,10 +143,10 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl{
     }
 
     function whitelistClaim(uint256 index_, bytes32[] calldata merkleProof_) public{
-        require(!_whitelist[index_][msg.sender], "Address has already claimed.");
-        bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
+        require(!_whitelist[index_][_msgSender()], "Address has already claimed.");
+        bytes32 leaf = keccak256(abi.encodePacked(_msgSender()));
         require(MerkleProof.verify(merkleProof_, _merkleRoot, leaf), "Invalid proof.");
-        _whitelist[index_][msg.sender] = true;
+        _whitelist[index_][_msgSender()] = true;
         _whitelistCount[index_] = _whitelistCount[index_].add(1);
     }
 
@@ -216,24 +216,24 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl{
         require(numberOfTokens_ > 0, "At least mint one");
         require(ts.add(numberOfTokens_) < _issueBatch[batch].startIndex.add(_issueBatch[batch].count), "Mint exceed batch issued");
         if(_issueBatch[batch].mintWhite) {
-            require(_whitelist[batch][msg.sender], "Mint only whitelist");
+            require(_whitelist[batch][_msgSender()], "Mint only whitelist");
             // owner can mint more
-            require(balanceOf(msg.sender).add(numberOfTokens_)<= _whitelistMintLimit || owner() == _msgSender(), "Exceed whitelist mint limit");
+            require(balanceOf(_msgSender()).add(numberOfTokens_)<= _whitelistMintLimit || owner() == _msgSender(), "Exceed whitelist mint limit");
         }
         uint256 total_fee = _issueBatch[batch].price.mul(numberOfTokens_);
         require(total_fee <= msg.value, "Insufficient funds");
 
         for (uint256 i = 1; i <= numberOfTokens_; i++) {
-            _safeMint(msg.sender, ts.add(i));
+            _safeMint(_msgSender(), ts.add(i));
         }
     }
 
     function mintList() external view returns (uint256[] memory) {
-        uint256 count = balanceOf(msg.sender);
+        uint256 count = balanceOf(_msgSender());
         uint256[] memory newArray = new uint256[](count);
 
         for (uint256 i = 0; i < count; i++) {
-            newArray[i] = tokenOfOwnerByIndex(msg.sender, i);
+            newArray[i] = tokenOfOwnerByIndex(_msgSender(), i);
         }
         return newArray;
     }
@@ -254,9 +254,9 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl{
     function makeProposalForWithdraw(address beneficiary_) public onlyRole(DEFAULT_ADMIN_ROLE) {
         require(!_withdrawProposalList[_withdrawProposalCount].execute, "only one proposal on the same time");
         address [] memory supporters=new address[](1);
-        supporters[0]=msg.sender;
-        _withdrawProposalList[_withdrawProposalCount] = withdrawProposal(msg.sender, supporters, beneficiary_, false);
-        emit makeWithdrawProposal(msg.sender, beneficiary_, _withdrawProposalCount);
+        supporters[0]=_msgSender();
+        _withdrawProposalList[_withdrawProposalCount] = withdrawProposal(_msgSender(), supporters, beneficiary_, false);
+        emit makeWithdrawProposal(_msgSender(), beneficiary_, _withdrawProposalCount);
         _withdrawProposalCount = _withdrawProposalCount.add(1);
     }
 
@@ -272,14 +272,14 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl{
     }
 
     function supportProposalForWithdraw(uint256 proposalId_) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(proposalId_ < _withdrawProposalCount, "wrong proposalId_");
+        require(proposalId_ < _withdrawProposalCount, "wrong proposalId");
         address[] memory supporters = _withdrawProposalList[proposalId_].supporters;
         for (uint i = 0; i < supporters.length; i++) {
-            if(supporters[i]==msg.sender) {
+            if(supporters[i]==_msgSender()) {
                 return;
             }
         }
-        _withdrawProposalList[proposalId_].supporters.push(msg.sender);
+        _withdrawProposalList[proposalId_].supporters.push(_msgSender());
         tryExecuteWithdrawProposal(proposalId_);
     }
 }
