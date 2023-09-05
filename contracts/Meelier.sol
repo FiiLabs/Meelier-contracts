@@ -228,6 +228,30 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl{
         }
     }
 
+    function transferBatch2One(address newOwner_, uint256[] memory tokenIds_) external {
+        for (uint256 i = 0; i < tokenIds_.length; i++) {
+            safeTransferFrom(_msgSender(), newOwner_, tokenIds_[i]);
+        }
+    }
+
+    function transferBatch2Many(address [] memory newOwners_, uint256[] memory tokenIds_) external {
+        require(newOwners_.length == tokenIds_.length, "array length inconsistent");
+        for (uint256 i = 0; i < tokenIds_.length; i++) {
+            safeTransferFrom(_msgSender(), newOwners_[i], tokenIds_[i]);
+        }
+    }
+
+    function transferAll2One(address newOwner_) external {
+        uint count = balanceOf(_msgSender());
+        uint256[] memory newArray = new uint256[](count);
+        for (uint256 i = 0; i < count; i++) {
+            newArray[i] = tokenOfOwnerByIndex(_msgSender(), i);
+        }
+        for (uint256 i = 0; i < count; i++) {
+            safeTransferFrom(_msgSender(), newOwner_, newArray[i]);
+        }
+    }
+    
     function mintList() external view returns (uint256[] memory) {
         uint256 count = balanceOf(_msgSender());
         uint256[] memory newArray = new uint256[](count);

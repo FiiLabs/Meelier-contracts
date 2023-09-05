@@ -164,10 +164,51 @@ const {
         for(let i=1;i<=50;i++) {
           expect(await meelier.tokenOfOwnerByIndex(owner.address, i-1)).to.equal(i);
         }
-        console.log(await meelier.mintList());
+        // console.log(await meelier.mintList());
         await expect(meelier.connect(otherAccount).mint(50, { value: nft_normal_price*BigInt(50) })).not.to.be.reverted;
-        console.log(await meelier.connect(otherAccount).mintList());
+        // console.log(await meelier.connect(otherAccount).mintList());
       });
+      it("mint batch and transfer batch", async function () {
+        const { meelier, owner} = await loadFixture(deployMeelierFixture);
+        await meelier.startMint(0);
+        expect(await meelier.addWhitelist(0, owner.address)).not.to.be.reverted;
+        await expect(meelier.mint(50, { value: nft_whitelist_price*BigInt(50) })).not.to.be.reverted;
+        const account_list = [
+          "0x8fbe0617F8aD2e069a13B24B5C45812F5f046BdA",
+          "0xB37E523BcAbF612527e20FeAC3e5dE55B16cDe6E",
+          "0xE972983086E03472109fc2aE60924b1b245A6331",
+          "0xEa6D83338B535E32A3b53E87568A97685F1ce7de",
+      ];
+        for(let i=1;i<=4;i++) {
+          expect(await meelier.isMinted(i)).to.equal(true);
+          expect(await meelier.ownerOf(i)).to.equal(owner.address);
+        }
+        const tokenIds1 = [
+          1,2,3,4
+      ];
+      await expect(meelier.transferBatch2One(account_list[0], tokenIds1)).not.to.be.reverted;
+      for(let i=1;i<=4;i++) {
+        expect(await meelier.ownerOf(i)).not.to.equal(owner.address);
+        expect(await meelier.ownerOf(i)).to.equal(account_list[0]);
+      }
+      const tokenIds2 = [
+        5,6,7,8
+    ];
+      await expect(meelier.transferBatch2Many(account_list, tokenIds2)).not.to.be.reverted;
+      for(let i=5;i<=8;i++) {
+        expect(await meelier.ownerOf(i)).not.to.equal(owner.address);
+        expect(await meelier.ownerOf(i)).to.equal(account_list[i-5]);
+      }
+      console.log(await meelier.mintList());
+      console.log(await meelier.balanceOf(owner.address));
+      await expect(meelier.transferAll2One(account_list[0])).not.to.be.reverted;
+      console.log(await meelier.mintList());
+      for(let i=9;i<=50;i++) {
+        expect(await meelier.ownerOf(i)).not.to.equal(owner.address);
+        expect(await meelier.ownerOf(i)).to.equal(account_list[0]);
+      }
+      });
+
     });
   });
   describe("withdraw", function () {
