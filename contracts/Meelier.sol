@@ -306,4 +306,12 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl{
         _withdrawProposalList[proposalId_].supporters.push(_msgSender());
         tryExecuteWithdrawProposal(proposalId_);
     }
+
+    function isPresale() external view returns (bool) {
+        require(
+            _issueBatchCount >= 1,
+            "issue nft error"
+        );
+        return _issueBatch[_issueBatchCount.sub(1)].mintWhite;
+    }
 }

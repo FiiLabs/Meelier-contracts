@@ -156,8 +156,11 @@ const {
       });
       it("Mint list", async function () {
         const { meelier, owner, otherAccount} = await loadFixture(deployMeelierFixture);
+        expect(await meelier.isPresale()).to.equal(true);
         await meelier.startMint(0);
+        expect(await meelier.isPresale()).to.equal(true);
         expect(await meelier.updateIssueBatch(0, 1, 1000, nft_normal_price, false)).not.to.be.reverted;
+        expect(await meelier.isPresale()).to.equal(false);
         await expect(meelier.mint(50, { value: nft_normal_price*BigInt(50) })).not.to.be.reverted;
         const nft_count = await meelier.balanceOf(owner.address);
         expect(nft_count).to.equal(50);
