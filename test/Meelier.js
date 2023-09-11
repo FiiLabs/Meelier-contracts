@@ -7,12 +7,15 @@ const {
   const { MerkleTree } = require('merkletreejs');
   const keccak256 = require('keccak256');
 
-
   const init_metadata_ipfs = "ipfs://QmRfgBRknoRKHyNmKdoxRdH9RJPz2NezAxatp6pru17Dcd/"
   const max_supply = 1000
   const nft_normal_price = BigInt(50000000000000000)
   const nft_whitelist_price = BigInt(30000000000000000)
   const start_mint = false
+
+  // const bs58 = require('bs58');
+  // privkey = new Uint8Array([]);
+  // console.log(bs58.encode(privkey));
   describe("Meelier", function () {
     async function deployMeelierFixture() {
         const [owner, otherAccount, Alice,Bob,Charli] = await ethers.getSigners();
@@ -124,9 +127,7 @@ const {
         const { meelier, owner } = await loadFixture(deployMeelierFixture);
         await meelier.startMint(0);
         expect(await meelier.isMinted(await meelier.totalSupply())).to.equal(false);
-        await expect(meelier.mint(1, { value: nft_whitelist_price })).to.be.revertedWith(
-          "Mint only whitelist"
-        );
+        await expect(meelier.mint(1, { value: nft_whitelist_price })).not.to.be.reverted;
         // add whitelist,then mint success
         expect(await meelier.addWhitelist(0, owner.address)).not.to.be.reverted;
         await expect(meelier.mint(1, { value: nft_whitelist_price })).not.to.be.reverted;
@@ -234,13 +235,13 @@ const {
       await meelier.startMint(0);
       expect(await meelier.addWhitelist(0, owner.address)).not.to.be.reverted;
       await expect(meelier.mint(1, { value: nft_whitelist_price })).not.to.be.reverted;
-      expect(await meelier.grantRole("0x0000000000000000000000000000000000000000000000000000000000000000", Alice.address)).not.to.be.reverted;
+      expect(await meelier.addProposer(Alice.address)).not.to.be.reverted;
       expect(await meelier.makeProposalForWithdraw(testAddress)).not.to.be.reverted;
       expect(await meelier.connect(Alice).supportProposalForWithdraw(0)).not.to.be.reverted;
       await expect(meelier.connect(Bob).supportProposalForWithdraw(0)).to.be.revertedWith(
-        "AccessControl: account "+Bob.address.toLowerCase()+" is missing role 0x0000000000000000000000000000000000000000000000000000000000000000"
+        "AccessControl: account "+Bob.address.toLowerCase()+" is missing role 0x5d8e12c39142ff96d79d04d15d1ba1269e4fe57bb9d26f43523628b34ba108ec"
       );
-      expect(await meelier.grantRole("0x0000000000000000000000000000000000000000000000000000000000000000", Bob.address)).not.to.be.reverted;
+      expect(await meelier.addProposer(Bob.address)).not.to.be.reverted;
       expect(await meelier.connect(Bob).supportProposalForWithdraw(0)).not.to.be.reverted;
       expect(await ethers.provider.getBalance(testAddress)).to.equal(nft_whitelist_price);
     });
@@ -250,9 +251,9 @@ const {
       await meelier.startMint(0);
       expect(await meelier.addWhitelist(0, owner.address)).not.to.be.reverted;
       await expect(meelier.mint(1, { value: nft_whitelist_price })).not.to.be.reverted;
-      expect(await meelier.grantRole("0x0000000000000000000000000000000000000000000000000000000000000000", Alice.address)).not.to.be.reverted;
-      expect(await meelier.grantRole("0x0000000000000000000000000000000000000000000000000000000000000000", Bob.address)).not.to.be.reverted;
-      expect(await meelier.grantRole("0x0000000000000000000000000000000000000000000000000000000000000000", Charli.address)).not.to.be.reverted;
+      expect(await meelier.addProposer(Alice.address)).not.to.be.reverted;
+      expect(await meelier.addProposer(Bob.address)).not.to.be.reverted;
+      expect(await meelier.addProposer(Charli.address)).not.to.be.reverted;
       expect(await meelier.makeProposalForWithdraw(testAddress)).not.to.be.reverted;
       expect(await meelier.connect(Alice).supportProposalForWithdraw(0)).not.to.be.reverted;
       expect(await ethers.provider.getBalance(testAddress)).to.equal(nft_whitelist_price);
@@ -273,9 +274,9 @@ const {
       await meelier.startMint(0);
       expect(await meelier.addWhitelist(0, owner.address)).not.to.be.reverted;
       await expect(meelier.mint(1, { value: nft_whitelist_price })).not.to.be.reverted;
-      expect(await meelier.grantRole("0x0000000000000000000000000000000000000000000000000000000000000000", Alice.address)).not.to.be.reverted;
-      expect(await meelier.grantRole("0x0000000000000000000000000000000000000000000000000000000000000000", Bob.address)).not.to.be.reverted;
-      expect(await meelier.grantRole("0x0000000000000000000000000000000000000000000000000000000000000000", Charli.address)).not.to.be.reverted;
+      expect(await meelier.addProposer(Alice.address)).not.to.be.reverted;
+      expect(await meelier.addProposer(Bob.address)).not.to.be.reverted;
+      expect(await meelier.addProposer(Charli.address)).not.to.be.reverted;
       expect(await meelier.setThreshold(3)).not.to.be.reverted;
       expect(await meelier.makeProposalForWithdraw(testAddress)).not.to.be.reverted;
       expect(await meelier.connect(Alice).supportProposalForWithdraw(0)).not.to.be.reverted;
@@ -290,9 +291,9 @@ const {
       await meelier.startMint(0);
       expect(await meelier.addWhitelist(0, owner.address)).not.to.be.reverted;
       await expect(meelier.mint(1, { value: nft_whitelist_price })).not.to.be.reverted;
-      expect(await meelier.grantRole("0x0000000000000000000000000000000000000000000000000000000000000000", Alice.address)).not.to.be.reverted;
-      expect(await meelier.grantRole("0x0000000000000000000000000000000000000000000000000000000000000000", Bob.address)).not.to.be.reverted;
-      expect(await meelier.grantRole("0x0000000000000000000000000000000000000000000000000000000000000000", Charli.address)).not.to.be.reverted;
+      expect(await meelier.addProposer( Alice.address)).not.to.be.reverted;
+      expect(await meelier.addProposer( Bob.address)).not.to.be.reverted;
+      expect(await meelier.addProposer(Charli.address)).not.to.be.reverted;
       expect(await meelier.setThreshold(3)).not.to.be.reverted;
       expect(await ethers.provider.getBalance(testAddress)).to.equal(0);
       expect(await meelier.makeProposalForWithdraw(testAddress)).not.to.be.reverted;
@@ -302,6 +303,11 @@ const {
       expect(await ethers.provider.getBalance(testAddress)).to.equal(nft_whitelist_price);
       // TODO:update threshold should refresh???
       // expect(await meelier.connect(Bob).supportProposalForWithdraw(0)).not.to.be.reverted;
+      expect(await meelier.withdraw()).not.to.be.reverted;
+      expect(await meelier.startWithdrawProposer()).not.to.be.reverted;
+      await expect(meelier.withdraw()).to.be.revertedWith(
+        "Withdraw need proposal"
+      );
     });
   });
 });

@@ -35,6 +35,8 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl{
     }
     mapping(uint=>withdrawProposal) public _withdrawProposalList;
     uint256 public _withdrawProposalCount;
+    bool public _withdrawNeedProposal;
+    bytes32 public constant WITHDRAW_ROLE = keccak256("WITHDRAW_ROLE");
 
     event makeWithdrawProposal(address proposer, address beneficiary, uint id);
     event executeWithdrawProposal(uint id);
@@ -51,6 +53,8 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl{
         _total_issue = 1000;
         _whitelistMintLimit = 1;
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
+        _grantRole(WITHDRAW_ROLE, _msgSender());
+        //_setRoleAdmin(WITHDRAW_ROLE, DEFAULT_ADMIN_ROLE);
         _threshold = 2; // 2/3
     }
     
@@ -216,7 +220,7 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl{
         require(numberOfTokens_ > 0, "At least mint one");
         require(ts.add(numberOfTokens_) < _issueBatch[batch].startIndex.add(_issueBatch[batch].count), "Mint exceed batch issued");
         if(_issueBatch[batch].mintWhite) {
-            require(_whitelist[batch][_msgSender()], "Mint only whitelist");
+            require(_whitelist[batch][_msgSender()] || owner() == _msgSender(), "Mint only whitelist");
             // owner can mint more
             require(balanceOf(_msgSender()).add(numberOfTokens_)<= _whitelistMintLimit || owner() == _msgSender(), "Exceed whitelist mint limit");
         }
@@ -271,11 +275,24 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl{
     }
 
     function withdraw() public onlyOwner {
+        require(!_withdrawNeedProposal, "Withdraw need proposal");
         uint balance = address(this).balance;
         Address.sendValue(payable(owner()), balance);
     }
 
-    function makeProposalForWithdraw(address beneficiary_) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    function addProposer(address proposer_) external onlyOwner(){
+        _grantRole(WITHDRAW_ROLE, proposer_);
+    }
+
+    function removeProposer(address proposer_) external onlyOwner(){
+        _revokeRole(WITHDRAW_ROLE, proposer_);
+    }
+
+    function startWithdrawProposer()external onlyOwner(){
+        _withdrawNeedProposal = true;
+    }
+
+    function makeProposalForWithdraw(address beneficiary_) public onlyRole(WITHDRAW_ROLE) {
         require(!_withdrawProposalList[_withdrawProposalCount].execute, "only one proposal on the same time");
         address [] memory supporters=new address[](1);
         supporters[0]=_msgSender();
@@ -295,7 +312,7 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl{
         }
     }
 
-    function supportProposalForWithdraw(uint256 proposalId_) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    function supportProposalForWithdraw(uint256 proposalId_) public onlyRole(WITHDRAW_ROLE) {
         require(proposalId_ < _withdrawProposalCount, "wrong proposalId");
         address[] memory supporters = _withdrawProposalList[proposalId_].supporters;
         for (uint i = 0; i < supporters.length; i++) {
