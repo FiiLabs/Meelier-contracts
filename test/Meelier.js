@@ -34,7 +34,8 @@ const {
         const batch = await meelier._issueBatch(0);
         expect(batch.startIndex).to.equal(1);
         expect(batch.count).to.equal(1000);
-        expect(batch.price).to.equal(nft_whitelist_price);
+        expect(batch.price).to.equal(nft_normal_price);
+        expect(batch.whitePrice).to.equal(nft_whitelist_price);
         expect(batch.mintWhite).to.equal(true);
       });
     });
@@ -132,12 +133,17 @@ const {
         expect(await meelier.addWhitelist(0, owner.address)).not.to.be.reverted;
         await expect(meelier.mint(1, { value: nft_whitelist_price })).not.to.be.reverted;
         expect(await meelier.isMinted(await meelier.totalSupply())).to.equal(true);
+        await meelier.publicSale(0);
+        await expect(meelier.mint(1, { value: nft_whitelist_price })).to.be.revertedWith(
+          "Insufficient funds"
+        );
+        await expect(meelier.mint(1, { value: nft_normal_price })).not.to.be.reverted;
+        expect(await meelier.isMinted(await meelier.totalSupply())).to.equal(true);
       });
 
       it("Mint 50 for market", async function () {
         const { meelier, owner, otherAccount} = await loadFixture(deployMeelierFixture);
         await meelier.startMint(0);
-        // expect(await meelier.updateIssueBatch(0, 1, 1000, nft_normal_price, false)).not.to.be.reverted;
         expect(await meelier.totalSupply()).to.equal(0);
         expect(await meelier.totalIssue()).to.equal(1000);
         for(let i=1;i<=50;i++) {
@@ -160,7 +166,11 @@ const {
         expect(await meelier.isPresale()).to.equal(true);
         await meelier.startMint(0);
         expect(await meelier.isPresale()).to.equal(true);
-        expect(await meelier.updateIssueBatch(0, 1, 1000, nft_normal_price, false)).not.to.be.reverted;
+        expect(await meelier.updateIssueBatch(0, 1, 1000, nft_normal_price,nft_whitelist_price, false)).not.to.be.reverted;
+        expect(await meelier.lockIssue()).not.to.be.reverted;
+        await expect( meelier.updateIssueBatch(0, 1, 1000, nft_normal_price,nft_whitelist_price, false)).to.be.revertedWith(
+          "Update issue forbid"
+        );
         expect(await meelier.isPresale()).to.equal(false);
         await expect(meelier.mint(50, { value: nft_normal_price*BigInt(50) })).not.to.be.reverted;
         const nft_count = await meelier.balanceOf(owner.address);

@@ -20,10 +20,12 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl{
         uint256 startIndex;
         uint256 count;
         uint256 price;
+        uint256 whitePrice;
         bool mintWhite;
     }
     mapping(uint=>issueBatchData) public _issueBatch;
     uint256 public _issueBatchCount;
+    bool public _issueLock;
     mapping(uint=>bool) public _startMint;
     uint256 private _whitelistMintLimit;
     uint256 private _threshold;
@@ -46,7 +48,8 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl{
         _issueBatch[0] = issueBatchData({
             startIndex: 1,
             count: 1000,
-            price: 0.03 ether,
+            price: 0.05 ether,
+            whitePrice:0.03 ether,
             mintWhite: true
         });
         _issueBatchCount = 1;
@@ -62,26 +65,41 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl{
         return super.supportsInterface(interfaceId);
     }
 
-    function addIssueBatch(uint256 startIndex_, uint256 count_,uint256 price_, bool mintWhite_) external onlyOwner() {
-        _issueBatch[_issueBatchCount] = issueBatchData(startIndex_, count_, price_, mintWhite_);
+    function addIssueBatch(uint256 startIndex_, uint256 count_,uint256 price_, uint256 whitePrice_, bool mintWhite_) external onlyOwner() {
+        require(!_issueLock, "Add issue forbid");
+        _issueBatch[_issueBatchCount] = issueBatchData(startIndex_, count_, price_, whitePrice_, mintWhite_);
         _issueBatchCount = _issueBatchCount.add(1);
     }
 
-    function updateIssueBatch(uint256 index_, uint256 startIndex_, uint256 count_,uint256 price_, bool mintWhite_) external onlyOwner() {
+    function updateIssueBatch(uint256 index_, uint256 startIndex_, uint256 count_,uint256 price_, uint256 whitePrice_,bool mintWhite_) external onlyOwner() {
+        require(!_issueLock, "Update issue forbid");
         require(index_ < _issueBatchCount, "Index out of bound");
         _issueBatch[index_].startIndex =  startIndex_;
         _issueBatch[index_].count =  count_;
         _issueBatch[index_].price =  price_;
+        _issueBatch[index_].whitePrice =  whitePrice_;
         _issueBatch[index_].mintWhite =  mintWhite_;
     }
 
     function removeIssueBatch() external onlyOwner() {
+        require(!_issueLock, "Remove issue forbid");
         require(_issueBatchCount > 0, "Batch empty");
         delete _issueBatch[_issueBatchCount.sub(1)];
         _issueBatchCount = _issueBatchCount.sub(1);
     }
 
+    //false:public sale,do not need whitelist.
+    function publicSale(uint256 index_) external onlyOwner() {
+        require(index_ < _issueBatchCount, "Index out of batch bound");
+        _issueBatch[index_].mintWhite =  false;
+    }
+
+    function lockIssue() external onlyOwner() {
+        _issueLock = true;
+    }
+
     function setTotalIssue(uint256 total_issue_) external onlyOwner() {
+        require(!_issueLock, "Update issue forbid");
         _total_issue = total_issue_;
     }
 
@@ -173,11 +191,11 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl{
         return _baseTokenURI;
     }
 
-    function burn(uint256 tokenId_) public onlyOwner {
-        require(tokenId_ > 0 && tokenId_ <= _total_issue, "Wrong tokenId");
-        require(_exists(tokenId_), "Only burn minted");
-        _burn(tokenId_);
-    }
+    // function burn(uint256 tokenId_) public onlyOwner {
+    //     require(tokenId_ > 0 && tokenId_ <= _total_issue, "Wrong tokenId");
+    //     require(_exists(tokenId_), "Only burn minted");
+    //     _burn(tokenId_);
+    // }
 
     function getMintPrice(uint tokenId_) public view returns (uint256) {
         uint256 startIndex = 0;
@@ -188,7 +206,11 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl{
             startIndex = batchData.startIndex;
             endIndex = batchData.startIndex.add(batchData.count);
             if(tokenId_ >=startIndex && tokenId_ < endIndex) {
-                price = batchData.price;
+                if(batchData.mintWhite) {
+                    price = batchData.whitePrice;
+                } else {
+                    price = batchData.price;
+                }
                 break;
             }
         }
@@ -224,7 +246,12 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl{
             // owner can mint more
             require(balanceOf(_msgSender()).add(numberOfTokens_)<= _whitelistMintLimit || owner() == _msgSender(), "Exceed whitelist mint limit");
         }
-        uint256 total_fee = _issueBatch[batch].price.mul(numberOfTokens_);
+        uint256 total_fee = 0;
+        if(_issueBatch[batch].mintWhite) {
+            total_fee = _issueBatch[batch].whitePrice.mul(numberOfTokens_);
+        } else {
+            total_fee = _issueBatch[batch].price.mul(numberOfTokens_);
+        }
         require(total_fee <= msg.value, "Insufficient funds");
 
         for (uint256 i = 1; i <= numberOfTokens_; i++) {
