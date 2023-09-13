@@ -39,6 +39,7 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl{
     uint256 public _withdrawProposalCount;
     bool public _withdrawNeedProposal;
     bytes32 public constant WITHDRAW_ROLE = keccak256("WITHDRAW_ROLE");
+    uint256 public _withdrawProposerCount;
 
     event makeWithdrawProposal(address proposer, address beneficiary, uint id);
     event executeWithdrawProposal(uint id);
@@ -57,6 +58,7 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl{
         _whitelistMintLimit = 1;
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _grantRole(WITHDRAW_ROLE, _msgSender());
+        _withdrawProposerCount = 1;
         //_setRoleAdmin(WITHDRAW_ROLE, DEFAULT_ADMIN_ROLE);
         _threshold = 2; // 2/3
     }
@@ -308,14 +310,21 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl{
     }
 
     function addProposer(address proposer_) external onlyOwner(){
+        if(!hasRole(WITHDRAW_ROLE, proposer_)) {
+            _withdrawProposerCount = _withdrawProposerCount.add(1);
+        }
         _grantRole(WITHDRAW_ROLE, proposer_);
     }
 
     function removeProposer(address proposer_) external onlyOwner(){
+        if(hasRole(WITHDRAW_ROLE, proposer_)) {
+            _withdrawProposerCount = _withdrawProposerCount.sub(1);
+        }
         _revokeRole(WITHDRAW_ROLE, proposer_);
     }
 
     function startWithdrawProposer()external onlyOwner(){
+        require(_withdrawProposerCount>=_threshold, "need more proposer");
         _withdrawNeedProposal = true;
     }
 
