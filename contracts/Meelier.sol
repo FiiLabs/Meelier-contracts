@@ -8,8 +8,9 @@ import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/interfaces/IERC4906.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
 
-contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl{
+contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl, ERC721Burnable{
     using SafeMath for uint256;
     uint256 private _total_issue;
     string public _baseTokenURI;
@@ -40,6 +41,8 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl{
     bool public _withdrawNeedProposal;
     bytes32 public constant WITHDRAW_ROLE = keccak256("WITHDRAW_ROLE");
     uint256 public _withdrawProposerCount;
+    uint256 public _mintStartIndex;
+    uint256 public _mintStartTokenId;
 
     event makeWithdrawProposal(address proposer, address beneficiary, uint id);
     event executeWithdrawProposal(uint id);
@@ -63,10 +66,18 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl{
         _threshold = 2; // 2/3
     }
     
-    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC721Enumerable,AccessControl,IERC165) returns (bool) {
+    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC721Enumerable,AccessControl,IERC165,ERC721) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
-
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 firstTokenId,
+        uint256 batchSize
+    ) internal virtual override(ERC721Enumerable, ERC721) {
+        super._beforeTokenTransfer(from, to, firstTokenId, batchSize);
+    }
+    
     function addIssueBatch(uint256 startIndex_, uint256 count_,uint256 price_, uint256 whitePrice_, bool mintWhite_) external onlyOwner() {
         require(!_issueLock, "Add issue forbid");
         _issueBatch[_issueBatchCount] = issueBatchData(startIndex_, count_, price_, whitePrice_, mintWhite_);
@@ -98,6 +109,10 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl{
 
     function lockIssue() external onlyOwner() {
         _issueLock = true;
+    }
+
+    function setMintStartTokenId(uint256 mintStartTokenId_) external onlyOwner() {
+        _mintStartTokenId = mintStartTokenId_;
     }
 
     function setTotalIssue(uint256 total_issue_) external onlyOwner() {
@@ -193,13 +208,8 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl{
         return _baseTokenURI;
     }
 
-    // function burn(uint256 tokenId_) public onlyOwner {
-    //     require(tokenId_ > 0 && tokenId_ <= _total_issue, "Wrong tokenId");
-    //     require(_exists(tokenId_), "Only burn minted");
-    //     _burn(tokenId_);
-    // }
-
-    function getMintPrice(uint tokenId_) public view returns (uint256) {
+    function getMintPrice(uint tokenIdEx_) public view returns (uint256) {
+        uint tokenId_ = tokenIdEx_.sub(_mintStartTokenId);
         uint256 startIndex = 0;
         uint256 endIndex = 0;
         uint256 price = 0;
@@ -236,13 +246,12 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl{
     }
 
     function mint(uint numberOfTokens_) public payable {
-        uint256 ts = totalSupply();
-        uint256 firstId = ts.add(1);
+        uint256 firstId = _mintStartIndex.add(1);
         uint256 batch = tokenIndex2Batch(firstId);
         require(_startMint[batch]&& batch != type(uint256).max, "Mint not start");
-        require(ts.add(numberOfTokens_) <= _total_issue, "Mint exceed max issued");
+        require(_mintStartIndex.add(numberOfTokens_) <= _total_issue, "Mint exceed max issued");
         require(numberOfTokens_ > 0, "At least mint one");
-        require(ts.add(numberOfTokens_) < _issueBatch[batch].startIndex.add(_issueBatch[batch].count), "Mint exceed batch issued");
+        require(_mintStartIndex.add(numberOfTokens_) < _issueBatch[batch].startIndex.add(_issueBatch[batch].count), "Mint exceed batch issued");
         if(_issueBatch[batch].mintWhite) {
             require(_whitelist[batch][_msgSender()] || owner() == _msgSender(), "Mint only whitelist");
             // owner can mint more
@@ -256,9 +265,10 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl{
         }
         require(total_fee <= msg.value, "Insufficient funds");
 
-        for (uint256 i = 1; i <= numberOfTokens_; i++) {
-            _safeMint(_msgSender(), ts.add(i));
+        for (uint256 i = 0; i < numberOfTokens_; i++) {
+            _safeMint(_msgSender(), firstId.add(i).add(_mintStartTokenId));
         }
+        _mintStartIndex =_mintStartIndex.add(numberOfTokens_);
     }
 
     function transferBatch2One(address newOwner_, uint256[] memory tokenIds_) external {
@@ -297,7 +307,7 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl{
     
     function isMinted(uint256 tokenId_) external view returns (bool) {
         require(
-            tokenId_ <= _total_issue,
+            tokenId_ <= _total_issue.add(_mintStartTokenId),
             "tokenId outside collection bounds"
         );
         return _exists(tokenId_);

@@ -222,7 +222,21 @@ const {
         expect(await meelier.ownerOf(i)).to.equal(account_list[0]);
       }
       });
-
+      it("Mint change start token index", async function () {
+        const { meelier, owner, otherAccount} = await loadFixture(deployMeelierFixture);
+        await meelier.setMintStartTokenId(3000);
+        await meelier.startMint(0);
+        expect(await meelier.addWhitelist(0, owner.address)).not.to.be.reverted;
+        await expect(meelier.mint(1, { value: nft_whitelist_price })).not.to.be.reverted;
+        expect(await meelier.isMinted(3001)).to.equal(true);
+        await expect(meelier.mint(1, { value: nft_whitelist_price })).not.to.be.reverted;
+        expect(await meelier.isMinted(3002)).to.equal(true);
+        await expect(meelier.burn(3002)).not.to.be.reverted;
+        await expect(meelier.mint(1, { value: nft_whitelist_price })).not.to.be.reverted;
+        expect(await meelier.isMinted(3003)).to.equal(true);
+        expect(await meelier.getMintPrice(3003)).to.equal(nft_whitelist_price);
+        console.log(await meelier.mintList());
+      });
     });
   });
   describe("withdraw", function () {
@@ -318,6 +332,56 @@ const {
       await expect(meelier.withdraw()).to.be.revertedWith(
         "Withdraw need proposal"
       );
+    });
+  });
+
+  describe("burn", function () {
+    it("normal burn", async function () {
+      const { meelier, owner, otherAccount} = await loadFixture(deployMeelierFixture);
+      await meelier.startMint(0);
+      expect(await meelier.addWhitelist(0, owner.address)).not.to.be.reverted;
+      await expect(meelier.mint(1, { value: nft_whitelist_price })).not.to.be.reverted;
+      expect(await meelier.isMinted(1)).to.equal(true);
+      await expect(meelier.burn(2000)).to.be.revertedWith(
+        "ERC721: invalid token ID"
+      );
+      await expect(meelier.burn(2)).to.be.revertedWith(
+        "ERC721: invalid token ID"
+      );
+      await expect(meelier.connect(otherAccount).burn(1)).to.be.revertedWith(
+        "ERC721: caller is not token owner or approved"
+      );
+      expect(await meelier.burn(1)).not.to.be.reverted;
+      expect(await meelier.isMinted(1)).to.equal(false);
+      // tokenid 2
+      await expect(meelier.mint(1, { value: nft_whitelist_price })).not.to.be.reverted;
+      expect(await meelier.isMinted(1)).to.equal(false);
+      expect(await meelier.isMinted(2)).to.equal(true);
+      // tokenid 3
+      await expect(meelier.mint(1, { value: nft_whitelist_price })).not.to.be.reverted;
+      expect(await meelier.isMinted(3)).to.equal(true);
+      await expect(meelier.burn(1)).to.be.revertedWith(
+        "ERC721: invalid token ID"
+      );
+      // tokenid 4
+      await expect(meelier.mint(1, { value: nft_whitelist_price })).not.to.be.reverted;
+      expect(await meelier.isMinted(4)).to.equal(true);
+      await expect(meelier.connect(otherAccount).burn(4)).to.be.revertedWith(
+        "ERC721: caller is not token owner or approved"
+      );
+      await meelier.approve(otherAccount.address, 4);
+      expect(await meelier.connect(otherAccount).burn(4)).not.to.be.reverted;
+      expect(await meelier.isMinted(4)).to.equal(false);
+
+      const TNFTx = await ethers.getContractFactory("TNFT");
+      const TNFT = await TNFTx.deploy(meelier.target);
+      expect(await meelier.approve(TNFT.target, 3)).not.to.be.reverted;
+      expect(await TNFT.burn(3)).not.to.be.reverted;
+      expect(await meelier.isMinted(3)).to.equal(false);
+      expect(await meelier.totalSupply()).to.equal(1);
+      await expect(meelier.mint(1, { value: nft_whitelist_price })).not.to.be.reverted;
+      expect(await meelier.isMinted(5)).to.equal(true);
+      expect(await meelier.totalSupply()).to.equal(2);
     });
   });
 });
