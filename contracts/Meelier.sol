@@ -115,6 +115,10 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl, ERC721Bu
         _mintStartTokenId = mintStartTokenId_;
     }
 
+    function currentTokenId() public view returns (uint256) {
+        return _mintStartIndex.add(1).add(_mintStartTokenId);
+    }
+
     function setTotalIssue(uint256 total_issue_) external onlyOwner() {
         require(!_issueLock, "Update issue forbid");
         _total_issue = total_issue_;

@@ -14,23 +14,14 @@ async function main() {
 
   console.log( `deployed to ${meelier.target}`
   );
-
-  // const supply = await meelier.totalSupply();
-  // console.log("supply is:" + supply);
-  // const price = await meelier.getMintPrice(BigInt(supply) + BigInt(1));
-  // console.log("price is:" + price);
-  // const tx2 = await meelier.mint(2, { value: BigInt(2)*BigInt(price)});
-  // await tx2.wait();
-  // console.log("mint success,hash:"+ tx2.hash);
-  const tx1 = await meelier.updateIssueBatch(0, 1, 1000, BigInt(50000000000000000), BigInt(30000000000000000), false);
+  const tx1 = await meelier.publicSale(0);
   await tx1.wait();
-  console.log("updateIssueBatch success,hash:"+ tx1.hash);
-  const tx3 = await meelier.lockIssue();
-  await tx3.wait();
-  console.log("lock issue success,hash:"+ tx3.hash);
-  const tx4 = await meelier.setMintStartTokenId(1000);
-  await tx4.wait();
-  console.log("setMintStartTokenId success,hash:"+ tx4.hash);
+  console.log("start public sale,hash:"+ tx1.hash);
+
+  const tx2 = await meelier.lockIssue();
+  await tx2.wait();
+  console.log("lock issue success,hash:"+ tx2.hash);
+
   const tx = await meelier.startMint(0);
   await tx.wait();
   console.log("startMint success,hash:"+ tx.hash);
