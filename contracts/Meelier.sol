@@ -1,3 +1,9 @@
+/*
+ * Meelier MIGU
+ *
+ *
+ * Website: https://www.meelier.io/
+*/
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
@@ -9,8 +15,9 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/interfaces/IERC4906.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl, ERC721Burnable{
+contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl, ERC721Burnable, ReentrancyGuard{
     using SafeMath for uint256;
     uint256 private _total_issue;
     string public _baseTokenURI;
@@ -249,7 +256,7 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl, ERC721Bu
         return batch;
     }
 
-    function mint(uint numberOfTokens_) public payable {
+    function mint(uint numberOfTokens_) public payable nonReentrant{
         uint256 firstId = _mintStartIndex.add(1);
         uint256 batch = tokenIndex2Batch(firstId);
         require(_startMint[batch]&& batch != type(uint256).max, "Mint not start");
@@ -268,11 +275,12 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl, ERC721Bu
             total_fee = _issueBatch[batch].price.mul(numberOfTokens_);
         }
         require(total_fee <= msg.value, "Insufficient funds");
+        //Checks-Effects-Interactions
+        _mintStartIndex =_mintStartIndex.add(numberOfTokens_);
 
         for (uint256 i = 0; i < numberOfTokens_; i++) {
             _safeMint(_msgSender(), firstId.add(i).add(_mintStartTokenId));
         }
-        _mintStartIndex =_mintStartIndex.add(numberOfTokens_);
     }
 
     function transferBatch2One(address newOwner_, uint256[] memory tokenIds_) external {
@@ -321,6 +329,13 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl, ERC721Bu
         require(!_withdrawNeedProposal, "Withdraw need proposal");
         uint balance = address(this).balance;
         Address.sendValue(payable(owner()), balance);
+    }
+
+    function withdrawAny(uint256 balance_) public onlyOwner {
+        require(!_withdrawNeedProposal, "Withdraw need proposal");
+        uint balance = address(this).balance;
+        require(balance >= balance_, "Insufficient funds");
+        Address.sendValue(payable(owner()), balance_);
     }
 
     function addProposer(address proposer_) external onlyOwner(){

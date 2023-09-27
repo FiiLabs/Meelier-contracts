@@ -333,6 +333,27 @@ const {
         "Withdraw need proposal"
       );
     });
+    it("withdraw any", async function () {
+      const { meelier, owner, otherAccount, Alice,Bob,Charli} = await loadFixture(deployMeelierFixture);
+      await meelier.startMint(0);
+      expect(await meelier.addWhitelist(0, owner.address)).not.to.be.reverted;
+      await expect(meelier.mint(1, { value: nft_whitelist_price })).not.to.be.reverted;
+      let randomWallet = ethers.Wallet.createRandom();
+      randomWallet = randomWallet.connect(ethers.provider);
+      expect(await ethers.provider.getBalance(randomWallet.address)).to.equal(0);
+      expect(await meelier.transferOwnership(randomWallet.address)).not.to.be.reverted;
+      expect(await meelier.owner()).to.equal(randomWallet.address);
+      await otherAccount.sendTransaction({
+        to: randomWallet.address,
+        value: BigInt(1000000000000000000),
+      });
+      await expect(meelier.connect(randomWallet).withdrawAny(nft_whitelist_price + BigInt(1))).to.be.revertedWith(
+        "Insufficient funds"
+      );
+      tx = await meelier.connect(randomWallet).withdrawAny(nft_whitelist_price);
+      console.log(await ethers.provider.getBalance(randomWallet.address));
+      expect(await ethers.provider.getBalance(randomWallet.address)).to.be.greaterThan(BigInt(1000000000000000000));
+    });
   });
 
   describe("burn", function () {
