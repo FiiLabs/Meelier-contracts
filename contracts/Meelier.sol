@@ -3,6 +3,8 @@
  *
  *
  * Website: https://www.meelier.io/
+ * Twitter: https://twitter.com/MiguMeelier
+ * Discord: https://discord.gg/meelier
 */
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;

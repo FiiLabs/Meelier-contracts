@@ -31,6 +31,10 @@ module.exports = {
     hardhat: {
       initialDate:'01 Jan 1970 00:00:00 GMT',
     },
+    mainnet: {
+      url: API,
+      accounts: [`0x${PRIVATE_KEY}`]
+    },
     goerli: {
       url: API,
       accounts: [`0x${PRIVATE_KEY}`]
