@@ -340,6 +340,14 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl, ERC721Bu
         Address.sendValue(payable(owner()), balance_);
     }
 
+    function withdrawAnyToOne(uint256 balance_, address beneficiary_) public onlyOwner {
+        require(beneficiary_ != address(0), "address zero is not a valid owner");
+        require(!_withdrawNeedProposal, "Withdraw need proposal");
+        uint balance = address(this).balance;
+        require(balance >= balance_, "Insufficient funds");
+        Address.sendValue(payable(beneficiary_), balance_);
+    }
+
     function addProposer(address proposer_) external onlyOwner(){
         if(!hasRole(WITHDRAW_ROLE, proposer_)) {
             _withdrawProposerCount = _withdrawProposerCount.add(1);
@@ -360,6 +368,7 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl, ERC721Bu
     }
 
     function makeProposalForWithdraw(address beneficiary_) public onlyRole(WITHDRAW_ROLE) {
+        require(beneficiary_ != address(0), "address zero is not a valid owner");
         require(!_withdrawProposalList[_withdrawProposalCount].execute, "only one proposal on the same time");
         address [] memory supporters=new address[](1);
         supporters[0]=_msgSender();
