@@ -339,6 +339,20 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl, Reentran
         }
     }
 
+    function freeMint(uint numberOfTokens_) public onlyOwner {
+        uint256 firstId = _mintStartIndex.add(1);
+        uint256 batch = tokenIndex2Batch(firstId);
+        require(_startMint[batch]&& batch != type(uint256).max, "Mint not start");
+        require(_mintStartIndex.add(numberOfTokens_) <= _total_issue, "Mint exceed max issued");
+        require(numberOfTokens_ > 0, "At least mint one");
+        require(_mintStartIndex.add(numberOfTokens_) < _issueBatch[batch].startIndex.add(_issueBatch[batch].count), "Mint exceed batch issued");
+        _mintStartIndex =_mintStartIndex.add(numberOfTokens_);
+
+        for (uint256 i = 0; i < numberOfTokens_; i++) {
+            _safeMint(_msgSender(), firstId.add(i).add(_mintStartTokenId));
+        }
+    }
+
     function transferBatch2One(address newOwner_, uint256[] memory tokenIds_) external {
         for (uint256 i = 0; i < tokenIds_.length; i++) {
             safeTransferFrom(_msgSender(), newOwner_, tokenIds_[i]);

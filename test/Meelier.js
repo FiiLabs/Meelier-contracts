@@ -475,6 +475,13 @@ const {
       await meelier.connect(otherAccount).mint(100, { value: nft_normal_price*BigInt(100) });
       expect(await meelier.totalSupply()).to.equal(352);
       await meelier.connect(otherAccount).transferBatch2One(owner.address,[351,352]);
+
+      await expect(meelier.connect(otherAccount).freeMint(300) ).to.be.revertedWith(
+        "Ownable: caller is not the owner"
+      );
+      await meelier.freeMint(200);
+      await meelier.freeMint(100);
+      expect(await meelier.totalSupply()).to.equal(652);
     });
   });
 });
