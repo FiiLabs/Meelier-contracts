@@ -7,12 +7,19 @@
 const hre = require("hardhat");
 
 async function main() {
-  const meelier = await hre.ethers.deployContract("Meelier", ["Meelier Milo", "Meelier Milo", "ipfs://QmPmP8w3qwEZZ4uhNRWVhT28sYzHe97m3wrGmojbD9pdHh/"]);
+    meelier = await ethers.getContractFactory("Meelier");
+    meelier = await meelier.attach('0xa4dde395a671bbf1d63e037d6a3f8c5595957c11');
+  const tx1 = await meelier.withdraw();
+  await tx1.wait();
+  console.log("start public sale,hash:"+ tx1.hash);
 
-  await meelier.waitForDeployment();
+//   const tx2 = await meelier.lockIssue();
+//   await tx2.wait();
+//   console.log("lock issue success,hash:"+ tx2.hash);
 
-  console.log( `deployed to ${meelier.target}`
-  );
+//   const tx = await meelier.startMint(0);
+//   await tx.wait();
+//   console.log("startMint success,hash:"+ tx.hash);
 }
 
 // We recommend this pattern to be able to use async/await everywhere

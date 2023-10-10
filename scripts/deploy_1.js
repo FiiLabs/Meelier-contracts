@@ -7,7 +7,7 @@
 const hre = require("hardhat");
 
 async function main() {
-  const meelier = await hre.ethers.deployContract("Meelier", ["Meelier Milo", "Meelier Milo", "ipfs://QmVmczuqpsNM5AG6EM5eks8W2SdH4DBWJRaMNNdGaSq9V2/"]);
+  const meelier = await hre.ethers.deployContract("Meelier", ["Meelier Milo", "Meelier Milo", "ipfs://QmPmP8w3qwEZZ4uhNRWVhT28sYzHe97m3wrGmojbD9pdHh/"]);
 
   await meelier.waitForDeployment();
 
@@ -24,6 +24,14 @@ async function main() {
   const tx = await meelier.startMint(0);
   await tx.wait();
   console.log("startMint success,hash:"+ tx.hash);
+
+  const supply = await meelier.totalSupply();
+  console.log("supply is:" + supply);
+  const price = await meelier.getMintPrice(BigInt(supply) + BigInt(1));
+  console.log("price is:" + price);
+  const tx3 = await meelier.mint(1, { value: BigInt(1)*BigInt(price)});
+  await tx3.wait();
+  console.log("mint success,hash:"+ tx3.hash);
 }
 
 // We recommend this pattern to be able to use async/await everywhere

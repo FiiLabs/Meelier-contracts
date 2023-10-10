@@ -18,8 +18,9 @@ import "@openzeppelin/contracts/interfaces/IERC4906.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/common/ERC2981.sol";
 
-contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl, ERC721Burnable, ReentrancyGuard{
+contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl, ReentrancyGuard, ERC2981{
     using SafeMath for uint256;
     uint256 private _total_issue;
     string public _baseTokenURI;
@@ -52,6 +53,8 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl, ERC721Bu
     uint256 public _withdrawProposerCount;
     uint256 public _mintStartIndex;
     uint256 public _mintStartTokenId;
+    mapping(address=>bool) public _subWhitelist;//Community subscription whitelist
+    uint256 private _subWhitelistMintLimit;
 
     event makeWithdrawProposal(address proposer, address beneficiary, uint id);
     event executeWithdrawProposal(uint id);
@@ -60,22 +63,23 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl, ERC721Bu
         _baseTokenURI = baseTokenURI_;
         _issueBatch[0] = issueBatchData({
             startIndex: 1,
-            count: 1000,
+            count: 2000,
             price: 0.05 ether,
-            whitePrice:0.03 ether,
+            whitePrice:0.026 ether,
             mintWhite: true
         });
         _issueBatchCount = 1;
-        _total_issue = 1000;
+        _total_issue = 2000;
         _whitelistMintLimit = 1;
+        _subWhitelistMintLimit = 50;
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _grantRole(WITHDRAW_ROLE, _msgSender());
         _withdrawProposerCount = 1;
-        //_setRoleAdmin(WITHDRAW_ROLE, DEFAULT_ADMIN_ROLE);
         _threshold = 2; // 2/3
+        _setDefaultRoyalty(msg.sender, 500);//5% royalty
     }
     
-    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC721Enumerable,AccessControl,IERC165,ERC721) returns (bool) {
+    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC721Enumerable,AccessControl,IERC165, ERC2981) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
     function _beforeTokenTransfer(
@@ -83,7 +87,7 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl, ERC721Bu
         address to,
         uint256 firstTokenId,
         uint256 batchSize
-    ) internal virtual override(ERC721Enumerable, ERC721) {
+    ) internal virtual override(ERC721Enumerable) {
         super._beforeTokenTransfer(from, to, firstTokenId, batchSize);
     }
     
@@ -128,6 +132,16 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl, ERC721Bu
         return _mintStartIndex.add(1).add(_mintStartTokenId);
     }
 
+    function setDefaultRoyalty(address receiver, uint96 feeNumerator) external onlyOwner() {
+        super._setDefaultRoyalty( receiver,  feeNumerator);
+    }
+
+    function burn(uint256 tokenId) public {
+        require(_isApprovedOrOwner(_msgSender(), tokenId), "ERC721: caller is not token owner or approved");
+        super._burn(tokenId);
+        _resetTokenRoyalty(tokenId);
+    }
+
     function setTotalIssue(uint256 total_issue_) external onlyOwner() {
         require(!_issueLock, "Update issue forbid");
         _total_issue = total_issue_;
@@ -140,8 +154,16 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl, ERC721Bu
         }
     }
 
+    function setSubWhitelistMintLimit(uint256 subWhitelistMintLimit_) external onlyOwner() {
+        _subWhitelistMintLimit = subWhitelistMintLimit_;
+    }
+
     function setWhitelistMintLimit(uint256 whitelistMintLimit_) external onlyOwner() {
         _whitelistMintLimit = whitelistMintLimit_;
+    }
+
+    function subWhitelistMintLimit() public view returns (uint256) {
+        return _subWhitelistMintLimit;
     }
 
     function whitelistMintLimit() public view returns (uint256) {
@@ -175,6 +197,10 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl, ERC721Bu
         }
     }
 
+    function isWhitelist(uint256 index_, address lucky_) external view returns (bool) {
+        return _whitelist[index_][lucky_] || _subWhitelist[lucky_];
+    }
+
     function removeWhitelist(uint256 index_, address lucky_) external onlyOwner() {
         require(index_ < _issueBatchCount, "Index out of batch bound");
         if(_whitelist[index_][lucky_]) {
@@ -190,6 +216,24 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl, ERC721Bu
             if(_whitelist[index_][lucky_[i]]) {
                 _whitelist[index_][lucky_[i]] = false;
                 _whitelistCount[index_] = _whitelistCount[index_].sub(1);
+            }
+        }
+    }
+
+    function addSubWhitelistBatch(address[] memory lucky_) external onlyOwner() {
+        uint256 count = lucky_.length;
+        for (uint256 i = 0; i < count; i++) {
+            if(!_subWhitelist[lucky_[i]]) {
+                _subWhitelist[lucky_[i]] = true;
+            }
+        }
+    }
+
+    function removeSubWhitelistBatch(address[] memory lucky_) external onlyOwner() {
+        uint256 count = lucky_.length;
+        for (uint256 i = 0; i < count; i++) {
+            if(_subWhitelist[lucky_[i]]) {
+                _subWhitelist[lucky_[i]] = false;
             }
         }
     }
@@ -266,9 +310,19 @@ contract Meelier is ERC721Enumerable, Ownable, IERC4906, AccessControl, ERC721Bu
         require(numberOfTokens_ > 0, "At least mint one");
         require(_mintStartIndex.add(numberOfTokens_) < _issueBatch[batch].startIndex.add(_issueBatch[batch].count), "Mint exceed batch issued");
         if(_issueBatch[batch].mintWhite) {
-            require(_whitelist[batch][_msgSender()] || owner() == _msgSender(), "Mint only whitelist");
+            bool whitelistUser = _whitelist[batch][_msgSender()];
+            bool subWhitelistUser = _subWhitelist[_msgSender()];
+            require( whitelistUser || owner() == _msgSender() || subWhitelistUser, "Mint only whitelist");
             // owner can mint more
-            require(balanceOf(_msgSender()).add(numberOfTokens_)<= _whitelistMintLimit || owner() == _msgSender(), "Exceed whitelist mint limit");
+            uint256 afterBalance = balanceOf(_msgSender()).add(numberOfTokens_);
+            if(owner() != _msgSender()) {
+                if(subWhitelistUser) {
+                    require(afterBalance <= _subWhitelistMintLimit, "Exceed whitelist mint limit");
+                }
+                else if(whitelistUser) {
+                    require(afterBalance <= _whitelistMintLimit, "Exceed whitelist mint limit");
+                }
+            }
         }
         uint256 total_fee = 0;
         if(_issueBatch[batch].mintWhite) {

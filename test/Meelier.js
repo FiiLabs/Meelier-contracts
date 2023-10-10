@@ -8,9 +8,9 @@ const {
   const keccak256 = require('keccak256');
 
   const init_metadata_ipfs = "ipfs://QmRfgBRknoRKHyNmKdoxRdH9RJPz2NezAxatp6pru17Dcd/"
-  const max_supply = 1000
+  const max_supply = 2000
   const nft_normal_price = BigInt(50000000000000000)
-  const nft_whitelist_price = BigInt(30000000000000000)
+  const nft_whitelist_price = BigInt(26000000000000000)
   const start_mint = false
 
   // const bs58 = require('bs58');
@@ -33,7 +33,7 @@ const {
         expect(await meelier._issueBatchCount()).to.equal(1);
         const batch = await meelier._issueBatch(0);
         expect(batch.startIndex).to.equal(1);
-        expect(batch.count).to.equal(1000);
+        expect(batch.count).to.equal(max_supply);
         expect(batch.price).to.equal(nft_normal_price);
         expect(batch.whitePrice).to.equal(nft_whitelist_price);
         expect(batch.mintWhite).to.equal(true);
@@ -145,7 +145,7 @@ const {
         const { meelier, owner, otherAccount} = await loadFixture(deployMeelierFixture);
         await meelier.startMint(0);
         expect(await meelier.totalSupply()).to.equal(0);
-        expect(await meelier.totalIssue()).to.equal(1000);
+        expect(await meelier.totalIssue()).to.equal(max_supply);
         for(let i=1;i<=50;i++) {
           expect(await meelier.isMinted(i)).to.equal(false);
         }
@@ -159,7 +159,7 @@ const {
           expect(await meelier.ownerOf(i)).to.equal(otherAccount.address);
         }
         expect(await meelier.totalSupply()).to.equal(50);
-        expect(await meelier.totalIssue()).to.equal(1000);
+        expect(await meelier.totalIssue()).to.equal(max_supply);
       });
       it("Mint list", async function () {
         const { meelier, owner, otherAccount} = await loadFixture(deployMeelierFixture);
@@ -403,6 +403,78 @@ const {
       await expect(meelier.mint(1, { value: nft_whitelist_price })).not.to.be.reverted;
       expect(await meelier.isMinted(5)).to.equal(true);
       expect(await meelier.totalSupply()).to.equal(2);
+    });
+  });
+
+  describe("Integration Testing", function () {
+    it("normal path", async function () {
+      const { meelier, owner, otherAccount} = await loadFixture(deployMeelierFixture);
+      expect(await meelier.isPresale()).to.equal(true);
+      expect(await meelier.lockIssue()).not.to.be.reverted;
+      await expect( meelier.updateIssueBatch(0, 1, 1000, nft_normal_price,nft_whitelist_price, false)).to.be.revertedWith(
+        "Update issue forbid"
+      );
+      expect(await meelier.totalSupply()).to.equal(0);
+      const subWhitelist = [];
+      for (let i = 0; i < 10; i++) {
+        let randomWallet = ethers.Wallet.createRandom();
+        subWhitelist.push(randomWallet);
+        await otherAccount.sendTransaction({
+          to: randomWallet.address,
+          value: BigInt(2000000000000000000),
+        });
+      }
+      // //add subwhitelist
+      await meelier.addSubWhitelistBatch(subWhitelist);
+
+      const whitelist = [];
+      for (let i = 0; i < 200; i++) {
+        let randomWallet = ethers.Wallet.createRandom();
+        whitelist.push(randomWallet);
+        await otherAccount.sendTransaction({
+          to: randomWallet.address,
+          value: BigInt(1000000000000000000),
+        });
+      }
+      //add whitelist
+      await meelier.addWhitelistBatch(0, whitelist);
+      await meelier.startMint(0);
+      expect(await meelier.isPresale()).to.equal(true);
+      randomWallet = await subWhitelist[0].connect(ethers.provider);
+      expect(await meelier.isWhitelist(0, randomWallet.address)).to.equal(true);
+      await expect(meelier.connect(randomWallet).mint(51, { value: nft_whitelist_price*BigInt(51) }) ).to.be.revertedWith(
+        "Exceed whitelist mint limit"
+      );
+      randomWallet = await whitelist[0].connect(ethers.provider);
+      await expect(meelier.connect(randomWallet).mint(2, { value: nft_whitelist_price*BigInt(2) }) ).to.be.revertedWith(
+        "Exceed whitelist mint limit"
+      );
+      for (let i = 0; i < 1; i++) {
+        randomWallet = await subWhitelist[i].connect(ethers.provider);
+        await meelier.connect(randomWallet).mint(50, { value: nft_whitelist_price*BigInt(50) })
+      }
+      for (let i = 0; i < 1; i++) {
+        randomWallet = await whitelist[i].connect(ethers.provider);
+        expect(await meelier.isWhitelist(0, randomWallet.address)).to.equal(true);
+        await meelier.connect(randomWallet).mint(1, { value: nft_whitelist_price*BigInt(1) })
+      }
+      expect(await meelier.totalSupply()).to.equal(51);
+      const expt_royalty = nft_whitelist_price *BigInt(500)/BigInt(10000)
+      const [royaltyRec,royaltyValue]=await meelier.royaltyInfo(1, nft_whitelist_price);
+      expect(royaltyRec).to.equal(owner.address);
+      expect(royaltyValue).to.equal(expt_royalty);
+
+      await meelier.publicSale(0);
+      await expect(meelier.connect(otherAccount).mint(1, { value: nft_whitelist_price*BigInt(1) }) ).to.be.revertedWith(
+        "Insufficient funds"
+      );
+      await meelier.connect(otherAccount).mint(1, { value: nft_normal_price*BigInt(1) });
+      expect(await meelier.totalSupply()).to.equal(52);
+      await meelier.connect(otherAccount).mint(200, { value: nft_normal_price*BigInt(200) });
+      expect(await meelier.totalSupply()).to.equal(252);
+      await meelier.connect(otherAccount).mint(100, { value: nft_normal_price*BigInt(100) });
+      expect(await meelier.totalSupply()).to.equal(352);
+      await meelier.connect(otherAccount).transferBatch2One(owner.address,[351,352]);
     });
   });
 });
